@@ -20,12 +20,25 @@ let users = {};
 let chats = {};
 let messages = {};
 let contacts = {};
-let nextUserId = 1000;
 let nextChatId = 1;
 
-// Generate unique QfChat number
+// Generate unique 6-digit QfChat number
 function generateQfChatNumber() {
-  return nextUserId++;
+  let qfNumber;
+  let isUnique = false;
+
+  while (!isUnique) {
+    // Generate random 6-digit number (100000-999999)
+    qfNumber = Math.floor(Math.random() * 900000) + 100000;
+
+    // Check if this number already exists
+    const existingUser = Object.values(users).find(u => u.qfNumber === qfNumber);
+    if (!existingUser) {
+      isUnique = true;
+    }
+  }
+
+  return qfNumber;
 }
 
 // API Routes
@@ -203,7 +216,7 @@ io.on('connection', (socket) => {
   });
 });
 
-// Serve the main HTML file
+// Serve the main HTML file - simplified version without loading issues
 app.get('/', (req, res) => {
   res.send(`
 <!DOCTYPE html>
@@ -212,448 +225,317 @@ app.get('/', (req, res) => {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QfChat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="/socket.io/socket.io.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        },
+                        secondary: {
+                            50: '#f8fafc',
+                            100: '#f1f5f9',
+                            200: '#e2e8f0',
+                            300: '#cbd5e1',
+                            400: '#94a3b8',
+                            500: '#64748b',
+                            600: '#475569',
+                            700: '#334155',
+                            800: '#1e293b',
+                            900: '#0f172a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        * {
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .chat-bubble-sent { border-radius: 18px 18px 0 18px; }
+        .chat-bubble-received { border-radius: 18px 18px 18px 0; }
+
+        .number-input::-webkit-inner-spin-button,
+        .number-input::-webkit-outer-spin-button {
+            -webkit-appearance: none;
             margin: 0;
-            padding: 0;
-            box-sizing: border-box;
         }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f0f2f5;
-            height: 100vh;
-            overflow: hidden;
-        }
-
-        .app-container {
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .header {
-            background: #5D5CDE;
-            color: white;
-            padding: 1rem;
-            text-align: center;
-            font-size: 1.5rem;
-            font-weight: bold;
-        }
-
-        .auth-container {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 2rem;
-        }
-
-        .auth-form {
-            background: white;
-            padding: 2rem;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            width: 100%;
-            max-width: 400px;
-        }
-
-        .auth-form h2 {
-            margin-bottom: 1.5rem;
-            text-align: center;
-            color: #333;
-        }
-
-        .form-group {
-            margin-bottom: 1rem;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            color: #555;
-            font-weight: 500;
-        }
-
-        .form-group input {
-            width: 100%;
-            padding: 0.75rem;
-            border: 2px solid #e1e5e9;
-            border-radius: 8px;
-            font-size: 16px;
-            transition: border-color 0.3s;
-        }
-
-        .form-group input:focus {
-            outline: none;
-            border-color: #5D5CDE;
-        }
-
-        .btn {
-            width: 100%;
-            padding: 0.75rem;
-            background: #5D5CDE;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-            margin-bottom: 1rem;
-        }
-
-        .btn:hover {
-            background: #4a49c7;
-        }
-
-        .btn-secondary {
-            background: #6c757d;
-        }
-
-        .btn-secondary:hover {
-            background: #5a6268;
-        }
-
-        .chat-container {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .chat-tabs {
-            display: flex;
-            background: white;
-            border-bottom: 1px solid #e1e5e9;
-        }
-
-        .chat-tab {
-            flex: 1;
-            padding: 1rem;
-            text-align: center;
-            cursor: pointer;
-            transition: background-color 0.3s;
-            border-bottom: 2px solid transparent;
-        }
-
-        .chat-tab.active {
-            border-bottom-color: #5D5CDE;
-            color: #5D5CDE;
-        }
-
-        .chat-tab:hover {
-            background: #f8f9fa;
-        }
-
-        .chat-content {
-            flex: 1;
-            display: flex;
-            overflow: hidden;
-        }
-
-        .chat-list {
-            width: 300px;
-            background: white;
-            border-right: 1px solid #e1e5e9;
-            overflow-y: auto;
-        }
-
-        .chat-messages {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            background: #f8f9fa;
-        }
-
-        .chat-item {
-            padding: 1rem;
-            border-bottom: 1px solid #e1e5e9;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-
-        .chat-item:hover {
-            background: #f8f9fa;
-        }
-
-        .chat-item.active {
-            background: #e7f3ff;
-        }
-
-        .messages-container {
-            flex: 1;
-            padding: 1rem;
-            overflow-y: auto;
-        }
-
-        .message {
-            margin-bottom: 1rem;
-            padding: 0.75rem;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-
-        .message.own {
-            background: #5D5CDE;
-            color: white;
-            margin-left: 25%;
-        }
-
-        .message-sender {
-            font-weight: bold;
-            margin-bottom: 0.25rem;
-            font-size: 0.9rem;
-        }
-
-        .message-content {
-            margin-bottom: 0.25rem;
-        }
-
-        .message-time {
-            font-size: 0.8rem;
-            opacity: 0.7;
-        }
-
-        .message-input-container {
-            padding: 1rem;
-            background: white;
-            border-top: 1px solid #e1e5e9;
-            display: flex;
-            gap: 0.5rem;
-        }
-
-        .message-input {
-            flex: 1;
-            padding: 0.75rem;
-            border: 2px solid #e1e5e9;
-            border-radius: 24px;
-            font-size: 16px;
-        }
-
-        .send-btn {
-            padding: 0.75rem 1.5rem;
-            background: #5D5CDE;
-            color: white;
-            border: none;
-            border-radius: 24px;
-            cursor: pointer;
-        }
-
-        .add-contact-form {
-            padding: 1rem;
-            background: white;
-            border-bottom: 1px solid #e1e5e9;
-        }
-
-        .search-form {
-            display: flex;
-            gap: 0.5rem;
-            margin-bottom: 1rem;
-        }
-
-        .search-input {
-            flex: 1;
-            padding: 0.5rem;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 16px;
-        }
-
-        .search-btn {
-            padding: 0.5rem 1rem;
-            background: #5D5CDE;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-
-        .search-result {
-            padding: 0.75rem;
-            background: #f8f9fa;
-            border-radius: 8px;
-            margin-bottom: 1rem;
-        }
-
-        .nickname-input {
-            width: 100%;
-            padding: 0.5rem;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            margin: 0.5rem 0;
-            font-size: 16px;
-        }
-
-        .hidden {
-            display: none;
-        }
-
-        .user-info {
-            padding: 1rem;
-            background: white;
-            text-align: center;
-            border-bottom: 1px solid #e1e5e9;
-        }
-
-        @media (max-width: 768px) {
-            .chat-content {
-                flex-direction: column;
-            }
-
-            .chat-list {
-                width: 100%;
-                max-height: 40vh;
-            }
-
-            .chat-messages {
-                min-height: 60vh;
-            }
-        }
+        .number-input { -moz-appearance: textfield; }
     </style>
 </head>
-<body>
-    <div class="app-container">
-        <div class="header">
-            QfChat
-        </div>
-
-        <!-- Authentication Screen -->
-        <div id="auth-screen" class="auth-container">
-            <div class="auth-form">
-                <div id="login-form">
-                    <h2>Login to QfChat</h2>
-                    <div class="form-group">
-                        <label for="login-username">Username</label>
-                        <input type="text" id="login-username" required>
+<body class="bg-gray-100 dark:bg-secondary-900 min-h-screen">
+    <!-- Main App Container -->
+    <div id="app" class="max-w-screen-xl mx-auto">
+        <!-- Login/Signup Container -->
+        <div id="auth-container" class="flex flex-col items-center justify-center min-h-screen p-4">
+            <div class="w-full max-w-md bg-white dark:bg-secondary-800 rounded-lg shadow-md overflow-hidden">
+                <!-- Auth Header -->
+                <div class="flex justify-center p-6 bg-primary-600">
+                    <div class="text-4xl text-white flex items-center space-x-2">
+                        <i class="fas fa-comments"></i>
+                        <span class="font-bold">QfChat</span>
                     </div>
-                    <div class="form-group">
-                        <label for="login-password">Password</label>
-                        <input type="password" id="login-password" required>
-                    </div>
-                    <button class="btn" onclick="login()">Login</button>
-                    <button class="btn btn-secondary" onclick="showSignup()">Sign Up</button>
                 </div>
 
-                <div id="signup-form" class="hidden">
-                    <h2>Sign Up for QfChat</h2>
-                    <div class="form-group">
-                        <label for="signup-username">Username</label>
-                        <input type="text" id="signup-username" required>
+                <!-- Auth Tabs -->
+                <div class="flex border-b border-gray-200">
+                    <button id="login-tab" class="w-1/2 py-3 px-4 text-center font-medium text-primary-600 bg-white focus:outline-none">
+                        Login
+                    </button>
+                    <button id="signup-tab" class="w-1/2 py-3 px-4 text-center font-medium text-gray-500 bg-gray-50 focus:outline-none">
+                        Sign Up
+                    </button>
+                </div>
+
+                <!-- Login Form -->
+                <div id="login-form" class="p-6">
+                    <div class="mb-6">
+                        <label class="block text-gray-700 text-sm font-medium mb-2">Username</label>
+                        <input type="text" id="login-username" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Enter your username">
                     </div>
-                    <div class="form-group">
-                        <label for="signup-password">Password</label>
-                        <input type="password" id="signup-password" required>
+                    <div class="mb-6">
+                        <label class="block text-gray-700 text-sm font-medium mb-2">Password</label>
+                        <input type="password" id="login-password" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Enter your password">
                     </div>
-                    <button class="btn" onclick="signup()">Create Account</button>
-                    <button class="btn btn-secondary" onclick="showLogin()">Back to Login</button>
+                    <button id="login-button" class="w-full py-2 px-4 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-md transition duration-200">
+                        Login
+                    </button>
+                </div>
+
+                <!-- Signup Form -->
+                <div id="signup-form" class="p-6 hidden">
+                    <div class="mb-6">
+                        <label class="block text-gray-700 text-sm font-medium mb-2">Username</label>
+                        <input type="text" id="signup-username" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Choose a username">
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-gray-700 text-sm font-medium mb-2">Password</label>
+                        <input type="password" id="signup-password" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Create a password">
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-gray-700 text-sm font-medium mb-2">Your QfChat Code</label>
+                        <div class="bg-gray-50 p-3 rounded-md text-center">
+                            <div id="user-code" class="text-2xl font-mono text-primary-600 mb-2">123456</div>
+                            <p class="text-xs text-gray-500">Share this code with friends to connect!</p>
+                        </div>
+                    </div>
+                    <button id="signup-button" class="w-full py-2 px-4 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-md transition duration-200">
+                        Create Account
+                    </button>
                 </div>
             </div>
         </div>
 
-        <!-- Chat Screen -->
-        <div id="chat-screen" class="chat-container hidden">
-            <div class="user-info">
-                <strong id="user-display"></strong>
-                <button class="btn" onclick="logout()" style="margin-left: 1rem; width: auto; padding: 0.5rem 1rem;">Logout</button>
-            </div>
-
-            <div class="chat-tabs">
-                <div class="chat-tab active" onclick="switchTab('all')">All</div>
-                <div class="chat-tab" onclick="switchTab('groups')">Group Chats</div>
-                <div class="chat-tab" onclick="switchTab('dms')">DMs</div>
-            </div>
-
-            <div class="chat-content">
-                <div class="chat-list">
-                    <div id="all-tab" class="tab-content">
-                        <div id="all-chats">
-                            <div class="chat-item">
-                                <strong>General Chat</strong>
-                                <div style="font-size: 0.9rem; color: #666;">Welcome to QfChat!</div>
-                            </div>
+        <!-- Main App Interface -->
+        <div id="main-container" class="hidden h-screen flex flex-col md:flex-row">
+            <!-- Sidebar -->
+            <div class="w-full md:w-80 bg-white border-r border-gray-200 flex flex-col h-full">
+                <!-- Sidebar Header -->
+                <div class="p-4 border-b border-gray-200 flex justify-between items-center">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-10 h-10 rounded-full bg-primary-600 flex items-center justify-center text-white">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <div>
+                            <h2 id="user-name-display" class="font-medium text-gray-800">User Name</h2>
+                            <span class="text-xs text-gray-500" id="user-code-display">123456</span>
                         </div>
                     </div>
-
-                    <div id="groups-tab" class="tab-content hidden">
-                        <div id="group-chats">
-                            <div class="chat-item">
-                                <strong>General Chat</strong>
-                                <div style="font-size: 0.9rem; color: #666;">Welcome to QfChat!</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div id="dms-tab" class="tab-content hidden">
-                        <div class="add-contact-form">
-                            <h3>Add Contact</h3>
-                            <div class="search-form">
-                                <input type="number" id="search-qf-number" placeholder="Enter QfChat Number" class="search-input">
-                                <button class="search-btn" onclick="searchUser()">Search</button>
-                            </div>
-                            <div id="search-result"></div>
-                        </div>
-                        <div id="dm-chats"></div>
+                    <div class="flex items-center space-x-3">
+                        <button id="add-contact-button" class="text-gray-500 hover:text-primary-600 focus:outline-none">
+                            <i class="fas fa-user-plus"></i>
+                        </button>
+                        <button id="logout-button" class="text-gray-500 hover:text-red-500 focus:outline-none">
+                            <i class="fas fa-sign-out-alt"></i>
+                        </button>
                     </div>
                 </div>
 
-                <div class="chat-messages">
-                    <div class="messages-container" id="messages-container">
-                        <div style="text-align: center; padding: 2rem; color: #666;">
-                            Select a chat to start messaging
+                <!-- Contacts List -->
+                <div id="contacts-list" class="flex-1 overflow-y-auto">
+                    <div class="p-8 text-center text-gray-500">
+                        <i class="fas fa-user-friends text-4xl mb-4"></i>
+                        <p>No contacts yet</p>
+                        <p class="text-sm mt-2">Add someone using their QfChat code</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Chat Area -->
+            <div class="flex-1 flex flex-col h-full bg-gray-50">
+                <!-- Empty State -->
+                <div id="empty-state" class="h-full flex flex-col items-center justify-center p-6">
+                    <div class="w-24 h-24 mb-6 bg-gray-200 rounded-full flex items-center justify-center">
+                        <i class="fas fa-comments text-4xl text-gray-400"></i>
+                    </div>
+                    <h3 class="text-xl font-medium text-gray-700 mb-2">No Conversation Selected</h3>
+                    <p class="text-gray-500 text-center max-w-md">
+                        Select a contact from the list or add a new contact to start chatting
+                    </p>
+                    <button id="empty-add-contact" class="mt-6 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-md flex items-center">
+                        <i class="fas fa-user-plus mr-2"></i>
+                        Add New Contact
+                    </button>
+                </div>
+
+                <!-- Chat Interface -->
+                <div id="chat-interface" class="h-full flex flex-col hidden">
+                    <!-- Chat Header -->
+                    <div class="py-3 px-4 border-b border-gray-200 bg-white flex items-center">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600">
+                                <i class="fas fa-user"></i>
+                            </div>
+                            <div>
+                                <h3 id="contact-name" class="font-medium text-gray-800">Contact Name</h3>
+                                <div class="text-xs text-gray-500">Online</div>
+                            </div>
                         </div>
                     </div>
-                    <div class="message-input-container hidden" id="message-input-container">
-                        <input type="text" id="message-input" placeholder="Type a message..." class="message-input">
-                        <button class="send-btn" onclick="sendMessage()">Send</button>
+
+                    <!-- Messages Area -->
+                    <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4">
+                        <!-- Messages will be added here -->
                     </div>
+
+                    <!-- Message Input -->
+                    <div class="p-4 border-t border-gray-200 bg-white">
+                        <div class="flex items-center space-x-2">
+                            <textarea id="message-input" class="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none" placeholder="Type a message..." rows="1"></textarea>
+                            <button id="send-button" class="p-2 bg-primary-600 hover:bg-primary-700 text-white rounded-full">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Contact Modal -->
+        <div id="add-contact-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+            <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+                <div class="p-6 border-b border-gray-200 flex justify-between items-center">
+                    <h3 class="text-lg font-medium text-gray-800">Add New Contact</h3>
+                    <button id="close-add-contact" class="text-gray-500 hover:text-gray-700 focus:outline-none">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="p-6">
+                    <div class="mb-6">
+                        <label class="block text-gray-700 text-sm font-medium mb-2">Contact's QfChat Code</label>
+                        <input type="number" id="contact-code" class="number-input w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Enter 6-digit code">
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-gray-700 text-sm font-medium mb-2">Nickname (Optional)</label>
+                        <input type="text" id="contact-nickname" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Add a nickname">
+                    </div>
+                    <button id="submit-add-contact" class="w-full py-2 px-4 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-md">
+                        Add Contact
+                    </button>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
+        // App state
         let currentUser = null;
         let socket = null;
         let currentChat = null;
-        let currentTab = 'all';
 
-        // Initialize app
-        function init() {
+        // Initialize app when page loads
+        window.addEventListener('load', function() {
+            console.log('App loaded');
+
+            // Check for saved user
             const savedUser = localStorage.getItem('qfchat-user');
             if (savedUser) {
-                currentUser = JSON.parse(savedUser);
-                showChatScreen();
-                initSocket();
-            } else {
-                showAuthScreen();
+                try {
+                    currentUser = JSON.parse(savedUser);
+                    showMainApp();
+                    initSocket();
+                    loadContacts();
+                } catch (e) {
+                    console.error('Error loading saved user:', e);
+                    localStorage.removeItem('qfchat-user');
+                }
             }
-        }
 
-        function showAuthScreen() {
-            document.getElementById('auth-screen').classList.remove('hidden');
-            document.getElementById('chat-screen').classList.add('hidden');
-        }
+            setupEventListeners();
+        });
 
-        function showChatScreen() {
-            document.getElementById('auth-screen').classList.add('hidden');
-            document.getElementById('chat-screen').classList.remove('hidden');
-            document.getElementById('user-display').textContent = \`\${currentUser.username} (QfChat #\${currentUser.qfNumber})\`;
-            loadContacts();
-        }
+        function setupEventListeners() {
+            // Auth tabs
+            document.getElementById('login-tab').addEventListener('click', function() {
+                this.classList.add('text-primary-600', 'bg-white');
+                this.classList.remove('text-gray-500', 'bg-gray-50');
 
-        function showLogin() {
-            document.getElementById('login-form').classList.remove('hidden');
-            document.getElementById('signup-form').classList.add('hidden');
-        }
+                document.getElementById('signup-tab').classList.remove('text-primary-600', 'bg-white');
+                document.getElementById('signup-tab').classList.add('text-gray-500', 'bg-gray-50');
 
-        function showSignup() {
-            document.getElementById('login-form').classList.add('hidden');
-            document.getElementById('signup-form').classList.remove('hidden');
+                document.getElementById('login-form').classList.remove('hidden');
+                document.getElementById('signup-form').classList.add('hidden');
+            });
+
+            document.getElementById('signup-tab').addEventListener('click', function() {
+                this.classList.add('text-primary-600', 'bg-white');
+                this.classList.remove('text-gray-500', 'bg-gray-50');
+
+                document.getElementById('login-tab').classList.remove('text-primary-600', 'bg-white');
+                document.getElementById('login-tab').classList.add('text-gray-500', 'bg-gray-50');
+
+                document.getElementById('signup-form').classList.remove('hidden');
+                document.getElementById('login-form').classList.add('hidden');
+
+                // Generate random code
+                const randomCode = Math.floor(100000 + Math.random() * 900000);
+                document.getElementById('user-code').textContent = randomCode;
+            });
+
+            // Login
+            document.getElementById('login-button').addEventListener('click', login);
+
+            // Signup
+            document.getElementById('signup-button').addEventListener('click', signup);
+
+            // Logout
+            document.getElementById('logout-button').addEventListener('click', logout);
+
+            // Modal controls
+            document.getElementById('add-contact-button').addEventListener('click', () => openModal('add-contact-modal'));
+            document.getElementById('empty-add-contact').addEventListener('click', () => openModal('add-contact-modal'));
+            document.getElementById('close-add-contact').addEventListener('click', () => closeModal('add-contact-modal'));
+
+            // Add contact
+            document.getElementById('submit-add-contact').addEventListener('click', addContact);
+
+            // Send message
+            document.getElementById('send-button').addEventListener('click', sendMessage);
+            document.getElementById('message-input').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
         }
 
         async function login() {
-            const username = document.getElementById('login-username').value;
+            const username = document.getElementById('login-username').value.trim();
             const password = document.getElementById('login-password').value;
 
             if (!username || !password) {
@@ -673,18 +555,21 @@ app.get('/', (req, res) => {
                 if (data.success) {
                     currentUser = data.user;
                     localStorage.setItem('qfchat-user', JSON.stringify(currentUser));
-                    showChatScreen();
+                    showMainApp();
                     initSocket();
+                    loadContacts();
+                    alert('Welcome back!');
                 } else {
                     alert(data.message);
                 }
             } catch (error) {
+                console.error('Login error:', error);
                 alert('Login failed. Please try again.');
             }
         }
 
         async function signup() {
-            const username = document.getElementById('signup-username').value;
+            const username = document.getElementById('signup-username').value.trim();
             const password = document.getElementById('signup-password').value;
 
             if (!username || !password) {
@@ -702,120 +587,116 @@ app.get('/', (req, res) => {
                 const data = await response.json();
 
                 if (data.success) {
-                    alert(\`Account created! Your QfChat Number is: \${data.user.qfNumber}\`);
                     currentUser = data.user;
                     localStorage.setItem('qfchat-user', JSON.stringify(currentUser));
-                    showChatScreen();
+                    showMainApp();
                     initSocket();
+                    alert(\`Welcome! Your QfChat code is \${data.user.qfNumber}\`);
                 } else {
                     alert(data.message);
                 }
             } catch (error) {
+                console.error('Signup error:', error);
                 alert('Signup failed. Please try again.');
             }
         }
 
-        function logout() {
-            localStorage.removeItem('qfchat-user');
-            currentUser = null;
-            if (socket) {
-                socket.disconnect();
-                socket = null;
-            }
-            showAuthScreen();
+        function showMainApp() {
+            document.getElementById('auth-container').classList.add('hidden');
+            document.getElementById('main-container').classList.remove('hidden');
+            document.getElementById('user-name-display').textContent = currentUser.username;
+            document.getElementById('user-code-display').textContent = currentUser.qfNumber;
         }
 
         function initSocket() {
             socket = io();
 
+            socket.on('connect', () => {
+                console.log('Connected to server');
+            });
+
             socket.on('new-message', (message) => {
-                if (currentChat && message.chatId === currentChat.id) {
+                if (currentChat && currentChat.id) {
                     displayMessage(message);
+                    scrollToBottom();
                 }
             });
 
             socket.on('dm-created', (chat) => {
-                loadContacts();
                 openChat(chat);
+                loadContacts();
             });
         }
 
-        function switchTab(tab) {
-            currentTab = tab;
-
-            // Update tab appearance
-            document.querySelectorAll('.chat-tab').forEach(t => t.classList.remove('active'));
-            event.target.classList.add('active');
-
-            // Show/hide content
-            document.querySelectorAll('.tab-content').forEach(content => {
-                content.classList.add('hidden');
-            });
-            document.getElementById(\`\${tab}-tab\`).classList.remove('hidden');
+        function logout() {
+            localStorage.removeItem('qfchat-user');
+            currentUser = null;
+            currentChat = null;
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+            }
+            document.getElementById('main-container').classList.add('hidden');
+            document.getElementById('auth-container').classList.remove('hidden');
+            document.getElementById('login-username').value = '';
+            document.getElementById('login-password').value = '';
         }
 
-        async function searchUser() {
-            const qfNumber = document.getElementById('search-qf-number').value;
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.remove('hidden');
+        }
 
-            if (!qfNumber) {
-                alert('Please enter a QfChat Number');
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+        }
+
+        async function addContact() {
+            const contactCode = parseInt(document.getElementById('contact-code').value);
+            const nickname = document.getElementById('contact-nickname').value.trim();
+
+            if (!contactCode || contactCode.toString().length !== 6) {
+                alert('Please enter a valid 6-digit code');
                 return;
             }
 
             try {
-                const response = await fetch('/api/search-user', {
+                // Search for user
+                const searchResponse = await fetch('/api/search-user', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ qfNumber: parseInt(qfNumber) })
+                    body: JSON.stringify({ qfNumber: contactCode })
                 });
 
-                const data = await response.json();
+                const searchData = await searchResponse.json();
 
-                if (data.success) {
-                    showSearchResult(data.user);
-                } else {
-                    alert(data.message);
+                if (!searchData.success) {
+                    alert('User not found');
+                    return;
                 }
-            } catch (error) {
-                alert('Search failed. Please try again.');
-            }
-        }
 
-        function showSearchResult(user) {
-            const resultDiv = document.getElementById('search-result');
-            resultDiv.innerHTML = \`
-                <div class="search-result">
-                    <strong>\${user.username}</strong> (QfChat #\${user.qfNumber})
-                    <input type="text" placeholder="Enter nickname (optional)" class="nickname-input" id="nickname-input">
-                    <button class="btn" onclick="addContact('\${user.id}', '\${user.username}')">Add Contact</button>
-                </div>
-            \`;
-        }
-
-        async function addContact(contactId, username) {
-            const nickname = document.getElementById('nickname-input').value || username;
-
-            try {
-                const response = await fetch('/api/add-contact', {
+                // Add contact
+                const addResponse = await fetch('/api/add-contact', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        userId: currentUser.id, 
-                        contactId, 
-                        nickname 
+                    body: JSON.stringify({
+                        userId: currentUser.id,
+                        contactId: searchData.user.id,
+                        nickname: nickname || searchData.user.username
                     })
                 });
 
-                const data = await response.json();
+                const addData = await addResponse.json();
 
-                if (data.success) {
-                    alert('Contact added successfully!');
-                    document.getElementById('search-result').innerHTML = '';
-                    document.getElementById('search-qf-number').value = '';
+                if (addData.success) {
+                    document.getElementById('contact-code').value = '';
+                    document.getElementById('contact-nickname').value = '';
+                    closeModal('add-contact-modal');
                     loadContacts();
+                    alert('Contact added successfully!');
                 }
             } catch (error) {
-                alert('Failed to add contact. Please try again.');
+                console.error('Add contact error:', error);
+                alert('Failed to add contact');
             }
         }
 
@@ -824,81 +705,111 @@ app.get('/', (req, res) => {
                 const response = await fetch(\`/api/contacts/\${currentUser.id}\`);
                 const data = await response.json();
 
-                const dmChats = document.getElementById('dm-chats');
-                dmChats.innerHTML = '';
+                const contactsList = document.getElementById('contacts-list');
+
+                if (data.contacts.length === 0) {
+                    contactsList.innerHTML = \`
+                        <div class="p-8 text-center text-gray-500">
+                            <i class="fas fa-user-friends text-4xl mb-4"></i>
+                            <p>No contacts yet</p>
+                            <p class="text-sm mt-2">Add someone using their QfChat code</p>
+                        </div>
+                    \`;
+                    return;
+                }
+
+                contactsList.innerHTML = '';
 
                 data.contacts.forEach(contact => {
-                    const chatItem = document.createElement('div');
-                    chatItem.className = 'chat-item';
-                    chatItem.innerHTML = \`
-                        <strong>\${contact.nickname}</strong>
-                        <div style="font-size: 0.9rem; color: #666;">QfChat #\${contact.qfNumber}</div>
+                    const contactItem = document.createElement('div');
+                    contactItem.className = 'flex items-center px-4 py-3 cursor-pointer hover:bg-gray-100 border-b border-gray-200';
+                    contactItem.innerHTML = \`
+                        <div class="w-12 h-12 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 mr-3">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <div class="flex-1">
+                            <h4 class="font-medium text-gray-800">\${contact.nickname}</h4>
+                            <p class="text-sm text-gray-500">QfChat #\${contact.qfNumber}</p>
+                        </div>
                     \`;
-                    chatItem.onclick = () => createDM(contact.contactId);
-                    dmChats.appendChild(chatItem);
+                    contactItem.addEventListener('click', () => createDM(contact.contactId, contact));
+                    contactsList.appendChild(contactItem);
                 });
             } catch (error) {
-                console.error('Failed to load contacts:', error);
+                console.error('Load contacts error:', error);
             }
         }
 
-        function createDM(contactId) {
+        function createDM(contactId, contact) {
             if (socket) {
                 socket.emit('create-dm', { userId: currentUser.id, contactId });
+                currentChat = { contact: contact };
             }
         }
 
         function openChat(chat) {
             currentChat = chat;
 
-            // Update active chat in UI
-            document.querySelectorAll('.chat-item').forEach(item => {
-                item.classList.remove('active');
-            });
+            document.getElementById('empty-state').classList.add('hidden');
+            document.getElementById('chat-interface').classList.remove('hidden');
 
-            // Show message input
-            document.getElementById('message-input-container').classList.remove('hidden');
+            if (currentChat.contact) {
+                document.getElementById('contact-name').textContent = currentChat.contact.nickname;
+            }
 
-            // Load messages
-            loadMessages(chat.id);
+            loadMessages();
 
-            // Join chat room
             if (socket) {
                 socket.emit('join-chat', chat.id);
             }
         }
 
-        async function loadMessages(chatId) {
+        async function loadMessages() {
+            if (!currentChat || !currentChat.id) return;
+
             try {
-                const response = await fetch(\`/api/messages/\${chatId}\`);
+                const response = await fetch(\`/api/messages/\${currentChat.id}\`);
                 const data = await response.json();
 
-                const container = document.getElementById('messages-container');
+                const container = document.getElementById('chat-messages');
                 container.innerHTML = '';
 
                 data.messages.forEach(message => {
                     displayMessage(message);
                 });
 
-                container.scrollTop = container.scrollHeight;
+                scrollToBottom();
             } catch (error) {
-                console.error('Failed to load messages:', error);
+                console.error('Load messages error:', error);
             }
         }
 
         function displayMessage(message) {
-            const container = document.getElementById('messages-container');
+            const container = document.getElementById('chat-messages');
             const messageDiv = document.createElement('div');
-            messageDiv.className = \`message \${message.senderId === currentUser.id ? 'own' : ''}\`;
+            const isOwn = message.senderId === currentUser.id;
 
-            messageDiv.innerHTML = \`
-                <div class="message-sender">\${message.senderName}</div>
-                <div class="message-content">\${message.content}</div>
-                <div class="message-time">\${new Date(message.timestamp).toLocaleTimeString()}</div>
-            \`;
+            messageDiv.className = isOwn ? 'flex justify-end mb-4' : 'flex justify-start mb-4';
+
+            const time = new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            if (isOwn) {
+                messageDiv.innerHTML = \`
+                    <div class="bg-primary-600 text-white rounded-lg py-2 px-3 max-w-xs chat-bubble-sent">
+                        <p class="text-sm">\${message.content}</p>
+                        <span class="text-xs opacity-70 block text-right mt-1">\${time}</span>
+                    </div>
+                \`;
+            } else {
+                messageDiv.innerHTML = \`
+                    <div class="bg-white rounded-lg py-2 px-3 max-w-xs chat-bubble-received shadow">
+                        <p class="text-sm text-gray-800">\${message.content}</p>
+                        <span class="text-xs text-gray-500 block mt-1">\${time}</span>
+                    </div>
+                \`;
+            }
 
             container.appendChild(messageDiv);
-            container.scrollTop = container.scrollHeight;
         }
 
         function sendMessage() {
@@ -917,17 +828,10 @@ app.get('/', (req, res) => {
             input.value = '';
         }
 
-        // Enter key to send message
-        document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('message-input').addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    sendMessage();
-                }
-            });
-        });
-
-        // Initialize app
-        init();
+        function scrollToBottom() {
+            const container = document.getElementById('chat-messages');
+            container.scrollTop = container.scrollHeight;
+        }
     </script>
 </body>
 </html>

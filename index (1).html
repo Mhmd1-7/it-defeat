@@ -1,0 +1,1265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NumLink</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        },
+                        secondary: {
+                            50: '#f8fafc',
+                            100: '#f1f5f9',
+                            200: '#e2e8f0',
+                            300: '#cbd5e1',
+                            400: '#94a3b8',
+                            500: '#64748b',
+                            600: '#475569',
+                            700: '#334155',
+                            800: '#1e293b',
+                            900: '#0f172a',
+                        },
+                        accent: {
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                        }
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .animate-slide-up {
+            animation: slideUp 0.3s ease-out forwards;
+        }
+
+        .chat-bubble-sent {
+            border-radius: 18px 18px 0 18px;
+        }
+
+        .chat-bubble-received {
+            border-radius: 18px 18px 18px 0;
+        }
+
+        .typing-indicator {
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .typing-indicator span {
+            height: 8px;
+            width: 8px;
+            margin: 0 1px;
+            background-color: #94a3b8;
+            border-radius: 50%;
+            display: inline-block;
+            opacity: 0.4;
+        }
+
+        .typing-indicator span:nth-child(1) {
+            animation: pulse 1s infinite;
+        }
+
+        .typing-indicator span:nth-child(2) {
+            animation: pulse 1s infinite 0.2s;
+        }
+
+        .typing-indicator span:nth-child(3) {
+            animation: pulse 1s infinite 0.4s;
+        }
+
+        @keyframes pulse {
+            0% {
+                opacity: 0.4;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1.2);
+            }
+            100% {
+                opacity: 0.4;
+                transform: scale(1);
+            }
+        }
+
+        .number-input::-webkit-inner-spin-button,
+        .number-input::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        .number-input {
+            -moz-appearance: textfield;
+        }
+
+        .code-input {
+            letter-spacing: 0.5em;
+            text-align: center;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-secondary-900 min-h-screen transition-colors duration-200">
+    <!-- Splash Screen -->
+    <div id="splash-screen" class="fixed inset-0 flex flex-col items-center justify-center bg-white dark:bg-secondary-900 z-50 transition-opacity duration-500">
+        <div class="relative mb-8">
+            <div class="absolute inset-0 bg-primary-500 rounded-full animate-pulse opacity-50"></div>
+            <div class="relative z-10 text-6xl font-bold text-primary-600 dark:text-primary-400">
+                <i class="fas fa-link rotate-45"></i>
+            </div>
+        </div>
+        <h1 class="text-4xl font-bold text-secondary-800 dark:text-white mb-2">NumLink</h1>
+        <p class="text-secondary-500 dark:text-secondary-400 mb-8">Connect with anyone, anywhere</p>
+        <div class="w-16 h-1 bg-primary-500 rounded-full animate-pulse"></div>
+    </div>
+
+    <!-- App Container -->
+    <div id="app" class="hidden max-w-screen-xl mx-auto">
+        <!-- Login/Signup Container -->
+        <div id="auth-container" class="flex flex-col items-center justify-center min-h-screen p-4">
+            <div class="w-full max-w-md bg-white dark:bg-secondary-800 rounded-lg shadow-md overflow-hidden">
+                <!-- Auth Header -->
+                <div class="flex justify-center p-6 bg-primary-600 dark:bg-primary-700">
+                    <div class="text-4xl text-white flex items-center space-x-2">
+                        <i class="fas fa-link rotate-45"></i>
+                        <span class="font-bold">NumLink</span>
+                    </div>
+                </div>
+
+                <!-- Auth Tabs -->
+                <div class="flex border-b border-gray-200 dark:border-secondary-700">
+                    <button id="login-tab" class="w-1/2 py-3 px-4 text-center font-medium text-primary-600 dark:text-primary-400 bg-white dark:bg-secondary-800 focus:outline-none">
+                        Login
+                    </button>
+                    <button id="signup-tab" class="w-1/2 py-3 px-4 text-center font-medium text-secondary-500 dark:text-secondary-400 bg-secondary-50 dark:bg-secondary-700 focus:outline-none">
+                        Sign Up
+                    </button>
+                </div>
+
+                <!-- Login Form -->
+                <div id="login-form" class="p-6">
+                    <div class="mb-6">
+                        <label for="login-code" class="block text-secondary-700 dark:text-secondary-300 text-sm font-medium mb-2">Your Numeric Code</label>
+                        <input type="number" id="login-code" class="number-input w-full px-4 py-2 border border-gray-300 dark:border-secondary-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-secondary-700 dark:text-white" placeholder="Enter your code">
+                    </div>
+                    <div class="mb-6">
+                        <label for="login-password" class="block text-secondary-700 dark:text-secondary-300 text-sm font-medium mb-2">Password</label>
+                        <input type="password" id="login-password" class="w-full px-4 py-2 border border-gray-300 dark:border-secondary-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-secondary-700 dark:text-white" placeholder="Enter your password">
+                    </div>
+                    <button id="login-button" class="w-full py-2 px-4 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-md shadow-sm transition duration-200">
+                        Login
+                    </button>
+                </div>
+
+                <!-- Signup Form -->
+                <div id="signup-form" class="p-6 hidden">
+                    <div class="mb-6">
+                        <label for="signup-name" class="block text-secondary-700 dark:text-secondary-300 text-sm font-medium mb-2">Full Name</label>
+                        <input type="text" id="signup-name" class="w-full px-4 py-2 border border-gray-300 dark:border-secondary-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-secondary-700 dark:text-white" placeholder="Enter your name">
+                    </div>
+                    <div class="mb-6">
+                        <label for="signup-email" class="block text-secondary-700 dark:text-secondary-300 text-sm font-medium mb-2">Email</label>
+                        <input type="email" id="signup-email" class="w-full px-4 py-2 border border-gray-300 dark:border-secondary-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-secondary-700 dark:text-white" placeholder="Enter your email">
+                    </div>
+                    <div class="mb-6">
+                        <label for="signup-password" class="block text-secondary-700 dark:text-secondary-300 text-sm font-medium mb-2">Password</label>
+                        <input type="password" id="signup-password" class="w-full px-4 py-2 border border-gray-300 dark:border-secondary-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-secondary-700 dark:text-white" placeholder="Create a password">
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-secondary-700 dark:text-secondary-300 text-sm font-medium mb-2">Your Numeric Code</label>
+                        <div class="bg-secondary-50 dark:bg-secondary-700 p-3 rounded-md flex flex-col items-center">
+                            <div id="user-code" class="text-2xl font-mono text-primary-600 dark:text-primary-400 mb-2 code-input">123456</div>
+                            <p class="text-xs text-secondary-500 dark:text-secondary-400 text-center">This is your unique identification code. Share it with friends to connect!</p>
+                        </div>
+                    </div>
+                    <button id="signup-button" class="w-full py-2 px-4 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-md shadow-sm transition duration-200">
+                        Create Account
+                    </button>
+                </div>
+            </div>
+
+            <!-- Theme Toggle Button -->
+            <button id="theme-toggle" class="mt-6 text-secondary-500 dark:text-secondary-400 focus:outline-none">
+                <i class="fas fa-moon text-lg"></i>
+            </button>
+        </div>
+
+        <!-- Main App Interface -->
+        <div id="main-container" class="hidden h-screen flex flex-col md:flex-row">
+            <!-- Sidebar - Contact List -->
+            <div id="sidebar" class="w-full md:w-80 md:min-w-[320px] bg-white dark:bg-secondary-800 border-r border-gray-200 dark:border-secondary-700 flex flex-col h-full">
+                <!-- Sidebar Header -->
+                <div class="p-4 border-b border-gray-200 dark:border-secondary-700 flex justify-between items-center">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-10 h-10 rounded-full bg-primary-600 dark:bg-primary-700 flex items-center justify-center text-white">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <div>
+                            <h2 id="user-name-display" class="font-medium text-secondary-800 dark:text-white">User Name</h2>
+                            <div class="flex items-center">
+                                <div class="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+                                <span class="text-xs text-secondary-500 dark:text-secondary-400">Online</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <button id="add-contact-button" class="text-secondary-500 dark:text-secondary-400 hover:text-primary-600 dark:hover:text-primary-400 focus:outline-none">
+                            <i class="fas fa-user-plus"></i>
+                        </button>
+                        <button id="settings-button" class="text-secondary-500 dark:text-secondary-400 hover:text-primary-600 dark:hover:text-primary-400 focus:outline-none">
+                            <i class="fas fa-cog"></i>
+                        </button>
+                        <button id="logout-button" class="text-secondary-500 dark:text-secondary-400 hover:text-red-500 focus:outline-none">
+                            <i class="fas fa-sign-out-alt"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Search Bar -->
+                <div class="p-4 border-b border-gray-200 dark:border-secondary-700">
+                    <div class="relative">
+                        <input type="text" id="search-contacts" class="w-full px-4 py-2 pl-10 pr-4 border border-gray-300 dark:border-secondary-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-secondary-700 dark:text-white" placeholder="Search contacts...">
+                        <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-secondary-400 dark:text-secondary-500"></i>
+                    </div>
+                </div>
+
+                <!-- Contacts List -->
+                <div id="contacts-list" class="flex-1 overflow-y-auto scrollbar-hide">
+                    <!-- Contact items will be added here dynamically -->
+                </div>
+            </div>
+
+            <!-- Main Chat Area -->
+            <div id="chat-area" class="flex-1 flex flex-col h-full bg-gray-50 dark:bg-secondary-900">
+                <!-- Empty State (No Chat Selected) -->
+                <div id="empty-state" class="h-full flex flex-col items-center justify-center p-6">
+                    <div class="w-24 h-24 mb-6 bg-gray-200 dark:bg-secondary-800 rounded-full flex items-center justify-center">
+                        <i class="fas fa-comments text-4xl text-gray-400 dark:text-secondary-600"></i>
+                    </div>
+                    <h3 class="text-xl font-medium text-secondary-700 dark:text-secondary-300 mb-2">No Conversation Selected</h3>
+                    <p class="text-secondary-500 dark:text-secondary-400 text-center max-w-md">
+                        Select a contact from the list or add a new contact to start chatting
+                    </p>
+                    <button id="empty-add-contact" class="mt-6 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-md shadow-sm transition duration-200 flex items-center">
+                        <i class="fas fa-user-plus mr-2"></i>
+                        Add New Contact
+                    </button>
+                </div>
+
+                <!-- Chat Interface (Initially Hidden) -->
+                <div id="chat-interface" class="h-full flex flex-col hidden">
+                    <!-- Chat Header -->
+                    <div class="py-3 px-4 border-b border-gray-200 dark:border-secondary-700 bg-white dark:bg-secondary-800 flex items-center justify-between">
+                        <div class="flex items-center">
+                            <div class="flex items-center space-x-3">
+                                <div class="relative">
+                                    <div id="contact-avatar" class="w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center text-primary-600 dark:text-primary-400">
+                                        <i class="fas fa-user"></i>
+                                    </div>
+                                    <div id="contact-status" class="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 border-white dark:border-secondary-800"></div>
+                                </div>
+                                <div>
+                                    <h3 id="contact-name" class="font-medium text-secondary-800 dark:text-white">Contact Name</h3>
+                                    <div id="contact-activity" class="text-xs text-secondary-500 dark:text-secondary-400">Online</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <button id="call-button" class="text-secondary-500 dark:text-secondary-400 hover:text-primary-600 dark:hover:text-primary-400 focus:outline-none">
+                                <i class="fas fa-phone-alt"></i>
+                            </button>
+                            <button id="video-button" class="text-secondary-500 dark:text-secondary-400 hover:text-primary-600 dark:hover:text-primary-400 focus:outline-none">
+                                <i class="fas fa-video"></i>
+                            </button>
+                            <button id="info-button" class="text-secondary-500 dark:text-secondary-400 hover:text-primary-600 dark:hover:text-primary-400 focus:outline-none">
+                                <i class="fas fa-info-circle"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Chat Messages Area -->
+                    <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide bg-gray-50 dark:bg-secondary-900">
+                        <!-- Messages will be added here dynamically -->
+                    </div>
+
+                    <!-- Message Input -->
+                    <div class="p-4 border-t border-gray-200 dark:border-secondary-700 bg-white dark:bg-secondary-800">
+                        <div class="flex items-end space-x-2">
+                            <button id="emoji-button" class="text-secondary-500 dark:text-secondary-400 hover:text-primary-600 dark:hover:text-primary-400 focus:outline-none px-2">
+                                <i class="far fa-smile"></i>
+                            </button>
+                            <button id="attachment-button" class="text-secondary-500 dark:text-secondary-400 hover:text-primary-600 dark:hover:text-primary-400 focus:outline-none px-2">
+                                <i class="fas fa-paperclip"></i>
+                            </button>
+                            <div class="flex-1 relative">
+                                <textarea id="message-input" class="w-full px-4 py-2 border border-gray-300 dark:border-secondary-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-secondary-700 dark:text-white resize-none" placeholder="Type a message..." rows="1"></textarea>
+                            </div>
+                            <button id="send-button" class="ml-2 p-2 bg-primary-600 hover:bg-primary-700 text-white rounded-full focus:outline-none">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Contact Modal -->
+        <div id="add-contact-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+            <div class="bg-white dark:bg-secondary-800 rounded-lg shadow-xl max-w-md w-full mx-4 animate-slide-up">
+                <div class="p-6 border-b border-gray-200 dark:border-secondary-700 flex justify-between items-center">
+                    <h3 class="text-lg font-medium text-secondary-800 dark:text-white">Add New Contact</h3>
+                    <button id="close-add-contact" class="text-secondary-500 dark:text-secondary-400 hover:text-secondary-700 dark:hover:text-secondary-200 focus:outline-none">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="p-6">
+                    <div class="mb-6">
+                        <label for="contact-code" class="block text-secondary-700 dark:text-secondary-300 text-sm font-medium mb-2">Contact's Numeric Code</label>
+                        <input type="number" id="contact-code" class="number-input w-full px-4 py-2 border border-gray-300 dark:border-secondary-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-secondary-700 dark:text-white" placeholder="Enter 6-digit code">
+                    </div>
+                    <div class="mb-6">
+                        <label for="contact-nickname" class="block text-secondary-700 dark:text-secondary-300 text-sm font-medium mb-2">Nickname (Optional)</label>
+                        <input type="text" id="contact-nickname" class="w-full px-4 py-2 border border-gray-300 dark:border-secondary-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-secondary-700 dark:text-white" placeholder="Add a nickname">
+                    </div>
+                    <button id="submit-add-contact" class="w-full py-2 px-4 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-md shadow-sm transition duration-200">
+                        Add Contact
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Modal -->
+        <div id="settings-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+            <div class="bg-white dark:bg-secondary-800 rounded-lg shadow-xl max-w-md w-full mx-4 animate-slide-up">
+                <div class="p-6 border-b border-gray-200 dark:border-secondary-700 flex justify-between items-center">
+                    <h3 class="text-lg font-medium text-secondary-800 dark:text-white">Settings</h3>
+                    <button id="close-settings" class="text-secondary-500 dark:text-secondary-400 hover:text-secondary-700 dark:hover:text-secondary-200 focus:outline-none">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="p-6">
+                    <div class="mb-6">
+                        <h4 class="text-secondary-800 dark:text-white font-medium mb-4">Account</h4>
+                        <div class="space-y-4">
+                            <div class="flex justify-between items-center">
+                                <div>
+                                    <p class="text-secondary-700 dark:text-secondary-300">Your Numeric Code</p>
+                                    <p id="settings-user-code" class="text-primary-600 dark:text-primary-400 font-mono">123456</p>
+                                </div>
+                                <button id="copy-code" class="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 focus:outline-none">
+                                    <i class="far fa-copy"></i>
+                                </button>
+                            </div>
+                            <div>
+                                <label for="settings-name" class="block text-secondary-700 dark:text-secondary-300 text-sm font-medium mb-2">Full Name</label>
+                                <input type="text" id="settings-name" class="w-full px-4 py-2 border border-gray-300 dark:border-secondary-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-secondary-700 dark:text-white">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-6">
+                        <h4 class="text-secondary-800 dark:text-white font-medium mb-4">Appearance</h4>
+                        <div class="flex items-center justify-between">
+                            <p class="text-secondary-700 dark:text-secondary-300">Dark Mode</p>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input id="dark-mode-toggle" type="checkbox" value="" class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-secondary-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-secondary-600 peer-checked:bg-primary-600"></div>
+                            </label>
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="text-secondary-800 dark:text-white font-medium mb-4">Notifications</h4>
+                        <div class="flex items-center justify-between mb-4">
+                            <p class="text-secondary-700 dark:text-secondary-300">Sound</p>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input id="sound-toggle" type="checkbox" value="" class="sr-only peer" checked>
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-secondary-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-secondary-600 peer-checked:bg-primary-600"></div>
+                            </label>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <p class="text-secondary-700 dark:text-secondary-300">Desktop Notifications</p>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input id="notification-toggle" type="checkbox" value="" class="sr-only peer" checked>
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-secondary-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-secondary-600 peer-checked:bg-primary-600"></div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-4 border-t border-gray-200 dark:border-secondary-700 flex justify-end">
+                    <button id="save-settings" class="py-2 px-4 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-md shadow-sm transition duration-200">
+                        Save Changes
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contact Info Modal -->
+        <div id="contact-info-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+            <div class="bg-white dark:bg-secondary-800 rounded-lg shadow-xl max-w-md w-full mx-4 animate-slide-up">
+                <div class="p-6 border-b border-gray-200 dark:border-secondary-700 flex justify-between items-center">
+                    <h3 class="text-lg font-medium text-secondary-800 dark:text-white">Contact Information</h3>
+                    <button id="close-contact-info" class="text-secondary-500 dark:text-secondary-400 hover:text-secondary-700 dark:hover:text-secondary-200 focus:outline-none">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="p-6">
+                    <div class="flex flex-col items-center mb-6">
+                        <div id="info-contact-avatar" class="w-24 h-24 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center text-primary-600 dark:text-primary-400 text-4xl mb-4">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <h4 id="info-contact-name" class="text-xl font-medium text-secondary-800 dark:text-white">Contact Name</h4>
+                        <div class="flex items-center mt-2">
+                            <div id="info-contact-status" class="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
+                            <span class="text-secondary-500 dark:text-secondary-400">Online</span>
+                        </div>
+                    </div>
+                    <div class="space-y-6">
+                        <div>
+                            <p class="text-sm text-secondary-500 dark:text-secondary-400 mb-1">Contact Code</p>
+                            <div class="flex justify-between items-center">
+                                <p id="info-contact-code" class="text-secondary-800 dark:text-white font-mono">654321</p>
+                                <button id="copy-contact-code" class="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 focus:outline-none">
+                                    <i class="far fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="text-sm text-secondary-500 dark:text-secondary-400 mb-1">Added On</p>
+                            <p id="info-added-date" class="text-secondary-800 dark:text-white">May 15, 2023</p>
+                        </div>
+                        <div>
+                            <label for="info-nickname" class="block text-sm text-secondary-500 dark:text-secondary-400 mb-1">Nickname</label>
+                            <div class="flex space-x-2">
+                                <input type="text" id="info-nickname" class="flex-1 px-4 py-2 border border-gray-300 dark:border-secondary-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-secondary-700 dark:text-white" placeholder="Add a nickname">
+                                <button id="save-nickname" class="p-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md focus:outline-none">
+                                    <i class="fas fa-save"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-4 border-t border-gray-200 dark:border-secondary-700 space-x-2">
+                    <button id="block-contact" class="py-2 px-4 bg-red-500 hover:bg-red-600 text-white font-medium rounded-md shadow-sm transition duration-200">
+                        <i class="fas fa-ban mr-2"></i> Block Contact
+                    </button>
+                    <button id="delete-contact" class="py-2 px-4 bg-gray-500 hover:bg-gray-600 text-white font-medium rounded-md shadow-sm transition duration-200">
+                        <i class="fas fa-trash-alt mr-2"></i> Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Call Modal -->
+        <div id="call-modal" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 hidden">
+            <div class="max-w-md w-full mx-4 animate-slide-up">
+                <div class="flex flex-col items-center">
+                    <div id="call-contact-avatar" class="w-32 h-32 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 text-6xl mb-6">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <h3 id="call-contact-name" class="text-2xl font-medium text-white mb-2">Contact Name</h3>
+                    <p id="call-status" class="text-gray-300 mb-8">Calling...</p>
+                    <div class="flex space-x-6">
+                        <button id="toggle-mute" class="w-14 h-14 rounded-full bg-gray-700 hover:bg-gray-600 text-white flex items-center justify-center transition duration-200">
+                            <i class="fas fa-microphone"></i>
+                        </button>
+                        <button id="end-call" class="w-14 h-14 rounded-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center transition duration-200">
+                            <i class="fas fa-phone-slash"></i>
+                        </button>
+                        <button id="toggle-speaker" class="w-14 h-14 rounded-full bg-gray-700 hover:bg-gray-600 text-white flex items-center justify-center transition duration-200">
+                            <i class="fas fa-volume-up"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notifications -->
+        <div id="notification-container" class="fixed bottom-4 right-4 z-50 space-y-4 max-w-xs w-full"></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Show splash screen for a few seconds
+            setTimeout(() => {
+                document.getElementById('splash-screen').classList.add('opacity-0');
+                setTimeout(() => {
+                    document.getElementById('splash-screen').classList.add('hidden');
+                    document.getElementById('app').classList.remove('hidden');
+                }, 500);
+            }, 2000);
+
+            // Auth tabs switching
+            document.getElementById('login-tab').addEventListener('click', function() {
+                // Switch tab appearance
+                this.classList.remove('text-secondary-500', 'dark:text-secondary-400', 'bg-secondary-50', 'dark:bg-secondary-700');
+                this.classList.add('text-primary-600', 'dark:text-primary-400', 'bg-white', 'dark:bg-secondary-800');
+
+                document.getElementById('signup-tab').classList.remove('text-primary-600', 'dark:text-primary-400', 'bg-white', 'dark:bg-secondary-800');
+                document.getElementById('signup-tab').classList.add('text-secondary-500', 'dark:text-secondary-400', 'bg-secondary-50', 'dark:bg-secondary-700');
+
+                // Switch forms
+                document.getElementById('login-form').classList.remove('hidden');
+                document.getElementById('signup-form').classList.add('hidden');
+            });
+
+            document.getElementById('signup-tab').addEventListener('click', function() {
+                // Switch tab appearance
+                this.classList.remove('text-secondary-500', 'dark:text-secondary-400', 'bg-secondary-50', 'dark:bg-secondary-700');
+                this.classList.add('text-primary-600', 'dark:text-primary-400', 'bg-white', 'dark:bg-secondary-800');
+
+                document.getElementById('login-tab').classList.remove('text-primary-600', 'dark:text-primary-400', 'bg-white', 'dark:bg-secondary-800');
+                document.getElementById('login-tab').classList.add('text-secondary-500', 'dark:text-secondary-400', 'bg-secondary-50', 'dark:bg-secondary-700');
+
+                // Switch forms
+                document.getElementById('signup-form').classList.remove('hidden');
+                document.getElementById('login-form').classList.add('hidden');
+
+                // Generate random code for new user
+                const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
+                document.getElementById('user-code').textContent = randomCode;
+            });
+
+            // Theme toggle
+            function toggleDarkMode() {
+                if (document.documentElement.classList.contains('dark')) {
+                    document.documentElement.classList.remove('dark');
+                    document.getElementById('theme-toggle').innerHTML = '<i class="fas fa-moon text-lg"></i>';
+                    document.getElementById('dark-mode-toggle').checked = false;
+                } else {
+                    document.documentElement.classList.add('dark');
+                    document.getElementById('theme-toggle').innerHTML = '<i class="fas fa-sun text-lg"></i>';
+                    document.getElementById('dark-mode-toggle').checked = true;
+                }
+            }
+
+            document.getElementById('theme-toggle').addEventListener('click', toggleDarkMode);
+            document.getElementById('dark-mode-toggle').addEventListener('change', toggleDarkMode);
+
+            // Check user's preferred color scheme
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                document.documentElement.classList.add('dark');
+                document.getElementById('theme-toggle').innerHTML = '<i class="fas fa-sun text-lg"></i>';
+                document.getElementById('dark-mode-toggle').checked = true;
+            }
+
+            // Login button - simulate login process
+            document.getElementById('login-button').addEventListener('click', function() {
+                const loginCode = document.getElementById('login-code').value;
+                const loginPassword = document.getElementById('login-password').value;
+
+                if (!loginCode || !loginPassword) {
+                    showNotification('Please enter your code and password', 'error');
+                    return;
+                }
+
+                // Simulate loading state
+                this.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Logging in...';
+                this.disabled = true;
+
+                // Simulate authentication delay
+                setTimeout(() => {
+                    // Show main app interface
+                    document.getElementById('auth-container').classList.add('hidden');
+                    document.getElementById('main-container').classList.remove('hidden');
+
+                    // Reset login button
+                    this.innerHTML = 'Login';
+                    this.disabled = false;
+
+                    // Set user info
+                    document.getElementById('user-name-display').textContent = 'John Doe';
+                    document.getElementById('settings-user-code').textContent = loginCode;
+                    document.getElementById('settings-name').value = 'John Doe';
+
+                    // Create demo contacts
+                    createDemoContacts();
+
+                    // Show welcome notification
+                    showNotification('Welcome back, John!', 'success');
+                }, 1500);
+            });
+
+            // Signup button
+            document.getElementById('signup-button').addEventListener('click', function() {
+                const name = document.getElementById('signup-name').value;
+                const email = document.getElementById('signup-email').value;
+                const password = document.getElementById('signup-password').value;
+                const code = document.getElementById('user-code').textContent;
+
+                if (!name || !email || !password) {
+                    showNotification('Please fill in all fields', 'error');
+                    return;
+                }
+
+                // Simulate loading state
+                this.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Creating Account...';
+                this.disabled = true;
+
+                // Simulate signup delay
+                setTimeout(() => {
+                    // Switch to main app interface
+                    document.getElementById('auth-container').classList.add('hidden');
+                    document.getElementById('main-container').classList.remove('hidden');
+
+                    // Reset signup button
+                    this.innerHTML = 'Create Account';
+                    this.disabled = false;
+
+                    // Set user info
+                    document.getElementById('user-name-display').textContent = name;
+                    document.getElementById('settings-user-code').textContent = code;
+                    document.getElementById('settings-name').value = name;
+
+                    // Show welcome notification
+                    showNotification('Account created successfully!', 'success');
+
+                    // Create demo contacts for new user
+                    createDemoContacts();
+                }, 1500);
+            });
+
+            // Logout button
+            document.getElementById('logout-button').addEventListener('click', function() {
+                // Show auth screen
+                document.getElementById('main-container').classList.add('hidden');
+                document.getElementById('auth-container').classList.remove('hidden');
+
+                // Clear login form
+                document.getElementById('login-code').value = '';
+                document.getElementById('login-password').value = '';
+
+                // Show notification
+                showNotification('You have been logged out', 'info');
+            });
+
+            // Modal control
+            function openModal(modalId) {
+                document.getElementById(modalId).classList.remove('hidden');
+            }
+
+            function closeModal(modalId) {
+                document.getElementById(modalId).classList.add('hidden');
+            }
+
+            // Add contact modal
+            document.getElementById('add-contact-button').addEventListener('click', () => openModal('add-contact-modal'));
+            document.getElementById('empty-add-contact').addEventListener('click', () => openModal('add-contact-modal'));
+            document.getElementById('close-add-contact').addEventListener('click', () => closeModal('add-contact-modal'));
+
+            // Settings modal
+            document.getElementById('settings-button').addEventListener('click', () => openModal('settings-modal'));
+            document.getElementById('close-settings').addEventListener('click', () => closeModal('settings-modal'));
+
+            // Contact info modal
+            document.getElementById('info-button').addEventListener('click', () => openModal('contact-info-modal'));
+            document.getElementById('close-contact-info').addEventListener('click', () => closeModal('contact-info-modal'));
+
+            // Call modal
+            document.getElementById('call-button').addEventListener('click', () => {
+                const contactName = document.getElementById('contact-name').textContent;
+                document.getElementById('call-contact-name').textContent = contactName;
+                openModal('call-modal');
+
+                // Simulate call connection
+                setTimeout(() => {
+                    document.getElementById('call-status').textContent = 'Connected';
+                }, 2000);
+            });
+
+            document.getElementById('end-call').addEventListener('click', () => {
+                closeModal('call-modal');
+                showNotification('Call ended', 'info');
+            });
+
+            // Submit add contact
+            document.getElementById('submit-add-contact').addEventListener('click', function() {
+                const contactCode = document.getElementById('contact-code').value;
+                const contactNickname = document.getElementById('contact-nickname').value || 'New Contact';
+
+                if (!contactCode) {
+                    showNotification('Please enter a contact code', 'error');
+                    return;
+                }
+
+                // Simulate loading state
+                this.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Adding...';
+                this.disabled = true;
+
+                // Simulate processing delay
+                setTimeout(() => {
+                    // Reset form and close modal
+                    document.getElementById('contact-code').value = '';
+                    document.getElementById('contact-nickname').value = '';
+                    this.innerHTML = 'Add Contact';
+                    this.disabled = false;
+                    closeModal('add-contact-modal');
+
+                    // Create new contact
+                    createContact({
+                        id: Date.now(),
+                        name: contactNickname,
+                        code: contactCode,
+                        lastMessage: 'Say hello to your new contact!',
+                        lastTime: 'Just now',
+                        unread: 0,
+                        online: true,
+                        avatar: null
+                    });
+
+                    // Show success notification
+                    showNotification('Contact added successfully!', 'success');
+                }, 1500);
+            });
+
+            // Copy buttons
+            document.getElementById('copy-code').addEventListener('click', function() {
+                const code = document.getElementById('settings-user-code').textContent;
+                navigator.clipboard.writeText(code).then(() => {
+                    showNotification('Code copied to clipboard!', 'success');
+                });
+            });
+
+            document.getElementById('copy-contact-code').addEventListener('click', function() {
+                const code = document.getElementById('info-contact-code').textContent;
+                navigator.clipboard.writeText(code).then(() => {
+                    showNotification('Contact code copied to clipboard!', 'success');
+                });
+            });
+
+            // Save settings
+            document.getElementById('save-settings').addEventListener('click', function() {
+                const name = document.getElementById('settings-name').value;
+
+                if (!name) {
+                    showNotification('Please enter your name', 'error');
+                    return;
+                }
+
+                // Update user name display
+                document.getElementById('user-name-display').textContent = name;
+
+                // Close modal
+                closeModal('settings-modal');
+
+                // Show success notification
+                showNotification('Settings saved successfully!', 'success');
+            });
+
+            // Save nickname
+            document.getElementById('save-nickname').addEventListener('click', function() {
+                const nickname = document.getElementById('info-nickname').value;
+
+                if (!nickname) {
+                    showNotification('Please enter a nickname', 'error');
+                    return;
+                }
+
+                // Update contact name display
+                document.getElementById('info-contact-name').textContent = nickname;
+                document.getElementById('contact-name').textContent = nickname;
+
+                // Find and update contact in list
+                const activeContactId = document.getElementById('chat-interface').dataset.contactId;
+                if (activeContactId) {
+                    const contactElement = document.querySelector(`.contact-item[data-id="${activeContactId}"] .contact-name`);
+                    if (contactElement) {
+                        contactElement.textContent = nickname;
+                    }
+                }
+
+                // Show success notification
+                showNotification('Nickname saved!', 'success');
+            });
+
+            // Block and delete contact buttons
+            document.getElementById('block-contact').addEventListener('click', function() {
+                closeModal('contact-info-modal');
+                showNotification('Contact blocked', 'info');
+
+                // Implement actual blocking functionality here
+            });
+
+            document.getElementById('delete-contact').addEventListener('click', function() {
+                const activeContactId = document.getElementById('chat-interface').dataset.contactId;
+                if (activeContactId) {
+                    const contactElement = document.querySelector(`.contact-item[data-id="${activeContactId}"]`);
+                    if (contactElement) {
+                        contactElement.remove();
+                    }
+                }
+
+                // Hide chat interface, show empty state
+                document.getElementById('chat-interface').classList.add('hidden');
+                document.getElementById('empty-state').classList.remove('hidden');
+
+                closeModal('contact-info-modal');
+                showNotification('Contact deleted', 'info');
+            });
+
+            // Call controls
+            document.getElementById('toggle-mute').addEventListener('click', function() {
+                this.classList.toggle('bg-red-600');
+                this.classList.toggle('bg-gray-700');
+
+                const icon = this.querySelector('i');
+                if (icon.classList.contains('fa-microphone')) {
+                    icon.classList.remove('fa-microphone');
+                    icon.classList.add('fa-microphone-slash');
+                    showNotification('Microphone muted', 'info');
+                } else {
+                    icon.classList.remove('fa-microphone-slash');
+                    icon.classList.add('fa-microphone');
+                    showNotification('Microphone unmuted', 'info');
+                }
+            });
+
+            document.getElementById('toggle-speaker').addEventListener('click', function() {
+                this.classList.toggle('bg-primary-600');
+                this.classList.toggle('bg-gray-700');
+
+                const icon = this.querySelector('i');
+                if (icon.classList.contains('fa-volume-up')) {
+                    icon.classList.remove('fa-volume-up');
+                    icon.classList.add('fa-volume-mute');
+                    showNotification('Speaker off', 'info');
+                } else {
+                    icon.classList.remove('fa-volume-mute');
+                    icon.classList.add('fa-volume-up');
+                    showNotification('Speaker on', 'info');
+                }
+            });
+
+            // Video call button (placeholder functionality)
+            document.getElementById('video-button').addEventListener('click', function() {
+                showNotification('Video calls coming soon!', 'info');
+            });
+
+            // Search contacts
+            document.getElementById('search-contacts').addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                const contacts = document.querySelectorAll('.contact-item');
+
+                contacts.forEach(contact => {
+                    const name = contact.querySelector('.contact-name').textContent.toLowerCase();
+                    if (name.includes(searchTerm)) {
+                        contact.style.display = 'flex';
+                    } else {
+                        contact.style.display = 'none';
+                    }
+                });
+            });
+
+            // Message input
+            const messageInput = document.getElementById('message-input');
+
+            messageInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+
+            // Auto-resize textarea as user types
+            messageInput.addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = (this.scrollHeight) + 'px';
+            });
+
+            // Send button
+            document.getElementById('send-button').addEventListener('click', sendMessage);
+
+            // Emoji button (placeholder functionality)
+            document.getElementById('emoji-button').addEventListener('click', function() {
+                messageInput.value += ' 😊';
+                messageInput.focus();
+            });
+
+            // Attachment button (placeholder functionality)
+            document.getElementById('attachment-button').addEventListener('click', function() {
+                showNotification('Attachments coming soon!', 'info');
+            });
+
+            // Send message function
+            function sendMessage() {
+                const messageText = messageInput.value.trim();
+                if (!messageText) return;
+
+                // Create message element
+                const messageEl = createMessage(messageText, 'sent');
+                document.getElementById('chat-messages').appendChild(messageEl);
+
+                // Scroll to bottom
+                document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
+
+                // Clear input
+                messageInput.value = '';
+                messageInput.style.height = 'auto';
+
+                // Update last message in contact list
+                const activeContactId = document.getElementById('chat-interface').dataset.contactId;
+                if (activeContactId) {
+                    const contactElement = document.querySelector(`.contact-item[data-id="${activeContactId}"] .contact-last-message`);
+                    if (contactElement) {
+                        contactElement.textContent = messageText.length > 30 ? messageText.substring(0, 30) + '...' : messageText;
+                    }
+
+                    const timeElement = document.querySelector(`.contact-item[data-id="${activeContactId}"] .contact-time`);
+                    if (timeElement) {
+                        timeElement.textContent = 'Just now';
+                    }
+                }
+
+                // Simulate reply after a delay
+                setTimeout(() => {
+                    // Show typing indicator
+                    const typingIndicator = document.createElement('div');
+                    typingIndicator.className = 'flex items-start mb-4';
+                    typingIndicator.innerHTML = `
+                        <div class="flex-shrink-0 mr-2">
+                            <div class="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center text-primary-600 dark:text-primary-400">
+                                <i class="fas fa-user text-sm"></i>
+                            </div>
+                        </div>
+                        <div class="bg-white dark:bg-secondary-800 rounded-lg py-2 px-3 max-w-xs chat-bubble-received">
+                            <div class="typing-indicator">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                        </div>
+                    `;
+                    document.getElementById('chat-messages').appendChild(typingIndicator);
+
+                    // Scroll to bottom
+                    document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
+
+                    // Remove typing indicator and show actual reply after another delay
+                    setTimeout(() => {
+                        typingIndicator.remove();
+
+                        // Generate auto reply
+                        let reply;
+                        if (messageText.toLowerCase().includes('hello') || messageText.toLowerCase().includes('hi')) {
+                            reply = 'Hello! How can I help you today?';
+                        } else if (messageText.toLowerCase().includes('how are you')) {
+                            reply = 'I\'m doing great, thanks for asking! How about you?';
+                        } else if (messageText.toLowerCase().includes('bye')) {
+                            reply = 'Goodbye! Have a nice day!';
+                        } else if (messageText.includes('?')) {
+                            reply = 'That\'s a good question. Let me think about it...';
+                        } else {
+                            const replies = [
+                                'Thanks for your message!',
+                                'Interesting point.',
+                                'I appreciate you reaching out.',
+                                'Let me get back to you on that.',
+                                'I understand what you\'re saying.',
+                                'That makes sense.'
+                            ];
+                            reply = replies[Math.floor(Math.random() * replies.length)];
+                        }
+
+                        // Create reply message
+                        const replyEl = createMessage(reply, 'received');
+                        document.getElementById('chat-messages').appendChild(replyEl);
+
+                        // Scroll to bottom
+                        document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
+
+                        // Update contact's last message
+                        if (activeContactId) {
+                            const contactElement = document.querySelector(`.contact-item[data-id="${activeContactId}"] .contact-last-message`);
+                            if (contactElement) {
+                                contactElement.textContent = reply.length > 30 ? reply.substring(0, 30) + '...' : reply;
+                            }
+
+                            const timeElement = document.querySelector(`.contact-item[data-id="${activeContactId}"] .contact-time`);
+                            if (timeElement) {
+                                timeElement.textContent = 'Just now';
+                            }
+                        }
+                    }, 1500);
+                }, 1000);
+            }
+
+            // Create message element
+            function createMessage(text, type) {
+                const messageContainer = document.createElement('div');
+                messageContainer.className = type === 'sent' ? 'flex items-end justify-end mb-4' : 'flex items-start mb-4';
+
+                const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                if (type === 'sent') {
+                    messageContainer.innerHTML = `
+                        <div class="bg-primary-600 text-white rounded-lg py-2 px-3 max-w-xs chat-bubble-sent">
+                            <p class="text-sm">${text}</p>
+                            <span class="text-xs opacity-70 mt-1 block text-right">${timeStr}</span>
+                        </div>
+                    `;
+                } else {
+                    messageContainer.innerHTML = `
+                        <div class="flex-shrink-0 mr-2">
+                            <div class="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center text-primary-600 dark:text-primary-400">
+                                <i class="fas fa-user text-sm"></i>
+                            </div>
+                        </div>
+                        <div class="bg-white dark:bg-secondary-800 rounded-lg py-2 px-3 max-w-xs chat-bubble-received">
+                            <p class="text-sm text-secondary-800 dark:text-white">${text}</p>
+                            <span class="text-xs text-secondary-500 dark:text-secondary-400 mt-1 block">${timeStr}</span>
+                        </div>
+                    `;
+                }
+
+                return messageContainer;
+            }
+
+            // Create contact element
+            function createContact(contact) {
+                const contactItem = document.createElement('div');
+                contactItem.className = 'contact-item flex items-center px-4 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-secondary-700 border-b border-gray-200 dark:border-secondary-700';
+                contactItem.dataset.id = contact.id;
+
+                contactItem.innerHTML = `
+                    <div class="relative mr-3">
+                        <div class="w-12 h-12 rounded-full ${contact.avatar ? '' : 'bg-primary-100 dark:bg-primary-900 flex items-center justify-center text-primary-600 dark:text-primary-400'}">
+                            ${contact.avatar ? `<img src="${contact.avatar}" alt="${contact.name}" class="w-full h-full rounded-full object-cover">` : '<i class="fas fa-user"></i>'}
+                        </div>
+                        <div class="absolute bottom-0 right-0 w-3 h-3 rounded-full ${contact.online ? 'bg-green-500' : 'bg-gray-400'} border-2 border-white dark:border-secondary-800"></div>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex justify-between items-center mb-1">
+                            <h4 class="contact-name font-medium text-secondary-800 dark:text-white truncate">${contact.name}</h4>
+                            <span class="contact-time text-xs text-secondary-500 dark:text-secondary-400">${contact.lastTime}</span>
+                        </div>
+                        <p class="contact-last-message text-sm text-secondary-500 dark:text-secondary-400 truncate">${contact.lastMessage}</p>
+                    </div>
+                    ${contact.unread > 0 ? `<div class="ml-2 bg-primary-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">${contact.unread}</div>` : ''}
+                `;
+
+                // Add click event
+                contactItem.addEventListener('click', function() {
+                    // Remove active class from all contacts
+                    document.querySelectorAll('.contact-item').forEach(item => {
+                        item.classList.remove('bg-gray-100', 'dark:bg-secondary-700');
+                    });
+
+                    // Add active class to clicked contact
+                    this.classList.add('bg-gray-100', 'dark:bg-secondary-700');
+
+                    // Remove unread badge if any
+                    const unreadBadge = this.querySelector('.bg-primary-600');
+                    if (unreadBadge) {
+                        unreadBadge.remove();
+                    }
+
+                    // Show chat interface, hide empty state
+                    document.getElementById('empty-state').classList.add('hidden');
+                    document.getElementById('chat-interface').classList.remove('hidden');
+
+                    // Store active contact ID
+                    document.getElementById('chat-interface').dataset.contactId = this.dataset.id;
+
+                    // Update contact info in chat header
+                    document.getElementById('contact-name').textContent = this.querySelector('.contact-name').textContent;
+                    document.getElementById('contact-activity').textContent = contact.online ? 'Online' : 'Offline';
+                    document.getElementById('contact-status').className = `absolute bottom-0 right-0 w-3 h-3 rounded-full ${contact.online ? 'bg-green-500' : 'bg-gray-400'} border-2 border-white dark:border-secondary-800`;
+
+                    // Update info in contact modal
+                    document.getElementById('info-contact-name').textContent = this.querySelector('.contact-name').textContent;
+                    document.getElementById('info-contact-code').textContent = contact.code;
+                    document.getElementById('info-contact-status').className = `w-3 h-3 rounded-full ${contact.online ? 'bg-green-500' : 'bg-gray-400'} mr-2`;
+                    document.getElementById('info-added-date').textContent = 'May 15, 2023';
+                    document.getElementById('info-nickname').value = this.querySelector('.contact-name').textContent;
+
+                    // Clear chat messages
+                    document.getElementById('chat-messages').innerHTML = '';
+
+                    // Add a welcome message if this is the first time opening the chat
+                    const welcomeMessage = createMessage(`Hello! This is the beginning of your conversation with ${this.querySelector('.contact-name').textContent}.`, 'received');
+                    document.getElementById('chat-messages').appendChild(welcomeMessage);
+
+                    // Focus message input
+                    document.getElementById('message-input').focus();
+                });
+
+                // Add contact to list
+                document.getElementById('contacts-list').appendChild(contactItem);
+
+                return contactItem;
+            }
+
+            // Create demo contacts
+            function createDemoContacts() {
+                const contacts = [
+                    {
+                        id: 1,
+                        name: 'Alice Johnson',
+                        code: '123987',
+                        lastMessage: 'Hey, how are you doing?',
+                        lastTime: '10:30 AM',
+                        unread: 2,
+                        online: true,
+                        avatar: null
+                    },
+                    {
+                        id: 2,
+                        name: 'Bob Smith',
+                        code: '456123',
+                        lastMessage: 'Can we meet tomorrow?',
+                        lastTime: 'Yesterday',
+                        unread: 0,
+                        online: false,
+                        avatar: null
+                    },
+                    {
+                        id: 3,
+                        name: 'Carol White',
+                        code: '789456',
+                        lastMessage: 'Thanks for your help!',
+                        lastTime: 'Yesterday',
+                        unread: 0,
+                        online: true,
+                        avatar: null
+                    },
+                    {
+                        id: 4,
+                        name: 'David Miller',
+                        code: '741852',
+                        lastMessage: 'I sent you the document',
+                        lastTime: 'Monday',
+                        unread: 0,
+                        online: true,
+                        avatar: null
+                    },
+                    {
+                        id: 5,
+                        name: 'Eve Wilson',
+                        code: '963258',
+                        lastMessage: 'Let\'s discuss the project details',
+                        lastTime: 'Sunday',
+                        unread: 0,
+                        online: false,
+                        avatar: null
+                    }
+                ];
+
+                // Clear existing contacts
+                document.getElementById('contacts-list').innerHTML = '';
+
+                // Create each contact
+                contacts.forEach(contact => {
+                    createContact(contact);
+                });
+            }
+
+            // Show notification function
+            function showNotification(message, type = 'info') {
+                const notification = document.createElement('div');
+                notification.className = `notification py-3 px-4 rounded-lg shadow-lg transform transition-all duration-300 translate-y-4 opacity-0`;
+
+                // Add proper styling based on type
+                switch(type) {
+                    case 'success':
+                        notification.classList.add('bg-green-500', 'text-white');
+                        break;
+                    case 'error':
+                        notification.classList.add('bg-red-500', 'text-white');
+                        break;
+                    case 'warning':
+                        notification.classList.add('bg-yellow-500', 'text-white');
+                        break;
+                    default: // info
+                        notification.classList.add('bg-primary-600', 'text-white');
+                }
+
+                notification.innerHTML = `
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0 mr-2">
+                            <i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle'}"></i>
+                        </div>
+                        <div class="flex-1">
+                            ${message}
+                        </div>
+                        <button class="ml-4 text-white focus:outline-none">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                `;
+
+                // Add to notification container
+                document.getElementById('notification-container').appendChild(notification);
+
+                // Animate in
+                setTimeout(() => {
+                    notification.classList.remove('translate-y-4', 'opacity-0');
+                }, 10);
+
+                // Add close button functionality
+                notification.querySelector('button').addEventListener('click', () => {
+                    notification.classList.add('translate-y-4', 'opacity-0');
+                    setTimeout(() => {
+                        notification.remove();
+                    }, 300);
+                });
+
+                // Auto remove after 5 seconds
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.classList.add('translate-y-4', 'opacity-0');
+                        setTimeout(() => {
+                            if (notification.parentNode) {
+                                notification.remove();
+                            }
+                        }, 300);
+                    }
+                }, 5000);
+            }
+
+            // Limit numeric input to numbers only
+            document.querySelectorAll('.number-input').forEach(input => {
+                input.addEventListener('input', function() {
+                    this.value = this.value.replace(/[^0-9]/g, '');
+                });
+            });
+        });
+    </script>
+</body>
+</html>
